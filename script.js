@@ -24,7 +24,7 @@ const servers = {
 // 1. Manual Camera Start
 async function startCamera(quality) {
     if(localStream) {
-        localStream.getTracks().forEach(track => track.stop()); // Purana camera band karein
+        localStream.getTracks().forEach(track => track.stop()); 
     }
     
     const constraints = quality === '1080' 
@@ -35,7 +35,6 @@ async function startCamera(quality) {
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
         localVideo.srcObject = localStream;
         
-        // Agar chalti call mein quality badli, toh data stream update karein
         if(peerConnection) {
             const videoTrack = localStream.getVideoTracks()[0];
             const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
@@ -46,7 +45,6 @@ async function startCamera(quality) {
     }
 }
 
-// Dropdown se quality change hone par
 qualitySelect.addEventListener('change', (e) => {
     startCamera(e.target.value);
 });
@@ -70,20 +68,16 @@ function setupPeerConnection() {
     };
 }
 
-// --- CALL CONNECT HONE PAR WHATSAPP JAISE UI SWAP KAREIN ---
+// 3. UI Swap Logic (WhatsApp PIP Mode)
 function switchToCallMode() {
     statusText.innerText = "Call Connected! 🟢";
     statusText.style.color = "#00ff88";
     
-    // Aapko choti screen par bhej diya (PIP)
     localVideo.className = 'pip-video';
-    // Dost ko badi screen par laaye
     remoteVideo.className = 'main-video'; 
 }
 
-// --- PIP SWAP LOGIC (Click karke Screen Badalna) ---
 function handleVideoClick(e) {
-    // Sirf tabhi swap ho jab choti screen (pip-video) par click ho
     if (e.target.classList.contains('pip-video')) {
         if (localVideo.classList.contains('pip-video')) {
             localVideo.className = 'main-video';
@@ -98,7 +92,7 @@ localVideo.addEventListener('click', handleVideoClick);
 remoteVideo.addEventListener('click', handleVideoClick);
 
 
-// 3. Call Lagana
+// 4. Call Lagana
 callButton.addEventListener('click', async () => {
     statusText.innerText = "Calling... ⏳";
     callButton.style.display = 'none';
@@ -109,7 +103,7 @@ callButton.addEventListener('click', async () => {
     socket.emit('offer', offer);
 });
 
-// 4. Offer Aana
+// 5. Offer Aana
 socket.on('offer', async (offer) => {
     incomingOffer = offer; 
     statusText.innerText = "Dost ki Call aa rahi hai! 📞";
@@ -119,10 +113,10 @@ socket.on('offer', async (offer) => {
     acceptButton.style.display = 'inline-block';
 });
 
-// 5. Call Uthana
+// 6. Call Uthana
 acceptButton.addEventListener('click', async () => {
     acceptButton.style.display = 'none';
-    switchToCallMode(); // WhatsApp mode ON
+    switchToCallMode(); 
 
     setupPeerConnection();
     await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
@@ -137,13 +131,19 @@ acceptButton.addEventListener('click', async () => {
     socket.emit('answer', answer);
 });
 
-// 6. Dost ne call uthai
+// 7. Dost ne call uthai (THE FIX IS HERE)
 socket.on('answer', async (answer) => {
-    switchToCallMode(); // WhatsApp mode ON
+    switchToCallMode(); 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+
+    // Fix: Caller ko bhi waiting list (Queue) wale network raste add karne padenge!
+    iceCandidateQueue.forEach(async (candidate) => {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+    iceCandidateQueue = [];
 });
 
-// 7. Network Rasta
+// 8. Network Rasta Aana
 socket.on('ice-candidate', async (candidate) => {
     if (peerConnection && peerConnection.remoteDescription) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -152,5 +152,5 @@ socket.on('ice-candidate', async (candidate) => {
     }
 });
 
-// Start with selected quality (Default: 1080p)
+// Start with selected quality
 startCamera(qualitySelect.value);
