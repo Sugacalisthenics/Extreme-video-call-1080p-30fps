@@ -14,7 +14,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            overflow-x: hidden; /* Screen ke bahar kuch na jaye */
+            overflow-x: hidden;
         }
         
         .controls {
@@ -70,9 +70,8 @@
             flex-wrap: wrap;
             gap: 20px;
             width: 100%;
-            max-width: 1200px;
+            max-width: 900px; /* Chat hatne ke baad video ko center me rakhega */
             justify-content: center;
-            align-items: flex-start;
             margin-top: 20px;
         }
 
@@ -80,8 +79,6 @@
             display: flex;
             flex-direction: column; 
             gap: 20px;
-            flex: 2;
-            min-width: 300px;
             width: 100%;
         }
         
@@ -100,86 +97,11 @@
             background-color: #000;
             box-shadow: 0px 0px 15px rgba(0, 255, 136, 0.2);
             object-fit: cover;
+            max-height: 70vh; /* Zada lambi na ho screen pe */
         }
         
         .mirror { transform: scaleX(-1); -webkit-transform: scaleX(-1); }
 
-        .chat-container {
-            flex: 1;
-            width: 100%;
-            min-width: 300px;
-            max-width: 600px;
-            background-color: #1a1a1a;
-            border: 2px solid #333;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            height: 450px;
-            z-index: 10;
-        }
-        .chat-header {
-            background-color: #333;
-            padding: 10px;
-            text-align: center;
-            font-weight: bold;
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
-        .chat-messages {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .chat-input-area {
-            display: flex;
-            padding: 10px;
-            background-color: #222;
-            border-bottom-left-radius: 10px;
-            border-bottom-right-radius: 10px;
-            align-items: center;
-        }
-        #chatInput {
-            flex: 1;
-            padding: 12px;
-            border-radius: 6px;
-            border: none;
-            background-color: #444;
-            color: #fff;
-            outline: none;
-            font-size: 16px;
-        }
-        #sendBtn {
-            margin-left: 8px;
-            background-color: #00ff88;
-            color: #000;
-            padding: 12px 15px;
-        }
-        #attachBtn {
-            background: transparent;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            margin-right: 10px;
-            padding: 5px;
-        }
-
-        /* NAYA FIX: Mobile Screen ke liye special Layout */
-        @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column; /* Phone par video aur chat upar neeche aayein */
-                align-items: center;
-            }
-            .chat-container {
-                width: 95vw; /* Phone ki poori width le */
-                max-width: 100%;
-                margin-top: 10px;
-                margin-bottom: 40px; /* Neeche thodi jagah chhod de */
-                height: 400px;
-            }
-        }
     </style>
 </head>
 <body>
@@ -214,17 +136,6 @@
                 <video id="remoteVideo" autoplay playsinline></video>
             </div>
         </div>
-
-        <div class="chat-container">
-            <div class="chat-header">Live Chat & Files 💬📁</div>
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input-area">
-                <input type="file" id="fileInput" style="display: none;" />
-                <button id="attachBtn" title="Send a File">📎</button>
-                <input type="text" id="chatInput" placeholder="Type a message..." />
-                <button id="sendBtn">Send</button>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
@@ -243,12 +154,6 @@
         const flipCamBtn = document.getElementById('flipCamBtn');
         const shareScreenBtn = document.getElementById('shareScreenBtn');
         const pipBtn = document.getElementById('pipBtn'); 
-        
-        const chatInput = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const chatMessages = document.getElementById('chatMessages');
-        const attachBtn = document.getElementById('attachBtn'); 
-        const fileInput = document.getElementById('fileInput'); 
 
         const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
@@ -316,8 +221,8 @@
                 
                 if(peerConnection && !screenStream) {
                     const videoTrack = localStream.getVideoTracks()[0];
-                    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-                    if(sender) sender.replaceTrack(videoTrack);
+                    const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if(sender) await sender.replaceTrack(videoTrack); // Added Await
                 }
                 
                 localStream.getAudioTracks()[0].enabled = !isAudioMuted;
@@ -351,35 +256,45 @@
             }
         });
 
+        // --- SCREEN SHARE BULLETPROOF FIX ---
         shareScreenBtn.addEventListener('click', async () => {
             if (!screenStream) {
                 try {
                     screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                     const screenTrack = screenStream.getVideoTracks()[0];
+                    
                     if (peerConnection) {
-                        const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-                        if (sender) sender.replaceTrack(screenTrack);
+                        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                        if (sender) {
+                            await sender.replaceTrack(screenTrack); // Await is crucial here!
+                        }
                     }
+                    
                     localVideo.srcObject = screenStream;
                     localVideo.classList.remove('mirror');
                     shareScreenBtn.innerText = "🛑 Stop Share";
                     shareScreenBtn.style.backgroundColor = "#ff3366";
+                    
                     screenTrack.onended = stopScreenShare;
-                } catch (e) { console.error("Screen share error", e); }
+                } catch (e) { 
+                    console.error("Screen share error", e); 
+                }
             } else {
                 stopScreenShare();
             }
         });
 
-        function stopScreenShare() {
+        async function stopScreenShare() {
             if (screenStream) {
                 screenStream.getTracks().forEach(track => track.stop());
                 screenStream = null;
             }
             if (localStream && peerConnection) {
                 const videoTrack = localStream.getVideoTracks()[0];
-                const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-                if (sender) sender.replaceTrack(videoTrack);
+                const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    await sender.replaceTrack(videoTrack); // Added Await here too!
+                }
             }
             localVideo.srcObject = localStream;
             if (currentFacingMode === "user") localVideo.classList.add('mirror');
@@ -400,79 +315,6 @@
                 console.error("PiP failed", error);
             }
         });
-
-        function appendMessage(text, isMe) {
-            const msgDiv = document.createElement('div');
-            msgDiv.innerText = text;
-            msgDiv.style.padding = "10px 15px";
-            msgDiv.style.borderRadius = "8px";
-            msgDiv.style.maxWidth = "80%";
-            msgDiv.style.width = "fit-content";
-            msgDiv.style.wordWrap = "break-word";
-            msgDiv.style.backgroundColor = isMe ? "#00ff88" : "#444";
-            msgDiv.style.color = isMe ? "#000" : "#fff";
-            msgDiv.style.alignSelf = isMe ? "flex-end" : "flex-start";
-            chatMessages.appendChild(msgDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight; 
-        }
-
-        function appendFile(fileObj, isMe) {
-            const msgDiv = document.createElement('div');
-            msgDiv.style.padding = "10px 15px";
-            msgDiv.style.borderRadius = "8px";
-            msgDiv.style.maxWidth = "80%";
-            msgDiv.style.width = "fit-content";
-            msgDiv.style.alignSelf = isMe ? "flex-end" : "flex-start";
-            msgDiv.style.backgroundColor = isMe ? "#00ff88" : "#444";
-
-            if (fileObj.type.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.src = fileObj.data;
-                img.style.maxWidth = "100%";
-                img.style.borderRadius = "4px";
-                msgDiv.appendChild(img);
-            } else {
-                const link = document.createElement('a');
-                link.href = fileObj.data;
-                link.download = fileObj.name;
-                link.innerText = `📁 Download ${fileObj.name}`;
-                link.style.color = isMe ? "#000" : "#00ff88";
-                link.style.fontWeight = "bold";
-                link.style.textDecoration = "none";
-                msgDiv.appendChild(link);
-            }
-            chatMessages.appendChild(msgDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        sendBtn.addEventListener('click', () => {
-            const msg = chatInput.value.trim();
-            if (msg) {
-                appendMessage(msg, true);
-                socket.emit('chat-message', msg); 
-                chatInput.value = '';
-            }
-        });
-        chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendBtn.click(); });
-        socket.on('chat-message', (msg) => appendMessage(msg, false));
-
-        attachBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', function() {
-            const file = this.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                alert("Maximum file size is 5MB for smooth transfer.");
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const fileObj = { name: file.name, type: file.type, data: e.target.result };
-                appendFile(fileObj, true);          
-                socket.emit('file-share', fileObj); 
-            };
-            reader.readAsDataURL(file);
-        });
-        socket.on('file-share', (fileObj) => appendFile(fileObj, false));
 
         function setupPeerConnection() {
             peerConnection = new RTCPeerConnection(servers);
