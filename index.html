@@ -49,8 +49,7 @@
         .action-btn { background-color: #333; color: #fff; border: 1px solid #555; }
         .action-btn.active { background-color: #ff3366; color: #fff; border: 1px solid #ff3366; }
         .action-btn.screen { background-color: #00aaff; color: #000; border: none; }
-        .action-btn.flip { background-color: #ffcc00; color: #000; border: none; }
-        .action-btn.pip { background-color: #9c27b0; color: #fff; border: none; } /* PiP Button */
+        .action-btn.pip { background-color: #9c27b0; color: #fff; border: none; } 
 
         #statusText {
             background-color: #333;
@@ -75,9 +74,10 @@
             margin-top: 20px;
         }
 
+        /* Fixed Video Container setup */
         .video-container {
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Force Stacked View */
             gap: 20px;
             flex: 2;
             min-width: 300px;
@@ -151,8 +151,6 @@
             background-color: #00ff88;
             color: #000;
         }
-        
-        /* Attachment Button Style */
         #attachBtn {
             background: transparent;
             border: none;
@@ -183,7 +181,7 @@
         <button id="toggleCamBtn" class="action-btn">📷 Cam On</button>
         <button id="flipCamBtn" class="action-btn flip">🔄 Flip Cam</button>
         <button id="shareScreenBtn" class="action-btn screen">💻 Share Screen</button>
-        <button id="pipBtn" class="action-btn pip">🔲 PiP Mode</button>
+        <button id="pipBtn" class="action-btn pip">🔲 Mini Screen</button> 
     </div>
     
     <div id="statusText">Waiting for participant to join... ⏳</div>

@@ -12,13 +12,13 @@ const toggleMicBtn = document.getElementById('toggleMicBtn');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
 const flipCamBtn = document.getElementById('flipCamBtn');
 const shareScreenBtn = document.getElementById('shareScreenBtn');
-const pipBtn = document.getElementById('pipBtn'); // PiP Button
+const pipBtn = document.getElementById('pipBtn'); 
 
 const chatInput = document.getElementById('chatInput');
 const sendBtn = document.getElementById('sendBtn');
 const chatMessages = document.getElementById('chatMessages');
-const attachBtn = document.getElementById('attachBtn'); // Attach Button
-const fileInput = document.getElementById('fileInput'); // File Input
+const attachBtn = document.getElementById('attachBtn'); 
+const fileInput = document.getElementById('fileInput'); 
 
 const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
@@ -41,6 +41,12 @@ const servers = {
     ]
 };
 
+// --- BULLETPROOF SCREEN ORDER FUNCTION ---
+function forceRemoteOnTop() {
+    remoteBox.style.order = "1";
+    localBox.style.order = "2";
+}
+
 socket.emit('join');
 socket.on('user-joined', () => {
     statusText.innerText = "Participant is online. Ready to call 📞";
@@ -57,7 +63,9 @@ socket.on('user-left', () => {
     statusText.innerText = "Participant has left the lobby ❌";
     statusText.style.backgroundColor = "#ff3366";
     statusText.style.color = "#fff";
-    videoContainer.insertBefore(localBox, remoteBox);
+    // Reset Order
+    localBox.style.order = "1";
+    remoteBox.style.order = "2";
 });
 
 // --- CAMERA SETUP ---
@@ -95,7 +103,7 @@ async function startCamera(quality) {
 }
 qualitySelect.addEventListener('change', (e) => startCamera(e.target.value));
 
-// --- BUTTONS LOGIC (Mic, Cam, Flip) ---
+// --- BUTTONS LOGIC ---
 flipCamBtn.addEventListener('click', () => {
     currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
     if (!screenStream) startCamera(qualitySelect.value);
@@ -155,15 +163,15 @@ function stopScreenShare() {
     shareScreenBtn.style.backgroundColor = "#00aaff";
 }
 
-// --- PIP MODE (Native Floating Window) ---
+// --- MINI SCREEN (Native PiP) ---
 pipBtn.addEventListener('click', async () => {
     try {
         if (document.pictureInPictureElement) {
             await document.exitPictureInPicture();
-        } else if (remoteVideo.readyState === 4) { // Video zinda honi chahiye
+        } else if (remoteVideo.readyState === 4 && remoteVideo.srcObject) { 
             await remoteVideo.requestPictureInPicture();
         } else {
-            alert("Bhai, pehle call toh connect hone de! 😉");
+            alert("Bhai, jab dost ki video start ho jayegi tab hi Mini Screen chalega!");
         }
     } catch (error) {
         console.error("PiP failed", error);
@@ -196,7 +204,6 @@ function appendFile(fileObj, isMe) {
     msgDiv.style.alignSelf = isMe ? "flex-end" : "flex-start";
     msgDiv.style.backgroundColor = isMe ? "#00ff88" : "#444";
 
-    // Agar image hai toh preview dikhao, warna download link
     if (fileObj.type.startsWith('image/')) {
         const img = document.createElement('img');
         img.src = fileObj.data;
@@ -228,13 +235,11 @@ sendBtn.addEventListener('click', () => {
 chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendBtn.click(); });
 socket.on('chat-message', (msg) => appendMessage(msg, false));
 
-// File Attach Logic
 attachBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', function() {
     const file = this.files[0];
     if (!file) return;
     
-    // Privacy + Performance (Limit 5MB to avoid socket crash)
     if (file.size > 5 * 1024 * 1024) {
         alert("Maximum file size is 5MB for smooth P2P transfer.");
         return;
@@ -243,8 +248,8 @@ fileInput.addEventListener('change', function() {
     const reader = new FileReader();
     reader.onload = function(e) {
         const fileObj = { name: file.name, type: file.type, data: e.target.result };
-        appendFile(fileObj, true);          // Apni screen par dikhao
-        socket.emit('file-share', fileObj); // Dost ko bhejo
+        appendFile(fileObj, true);          
+        socket.emit('file-share', fileObj); 
     };
     reader.readAsDataURL(file);
 });
@@ -283,11 +288,14 @@ socket.on('offer', async (offer) => {
     acceptButton.style.display = 'inline-block';
 });
 
+// Jab call Utha Li
 acceptButton.addEventListener('click', async () => {
     acceptButton.style.display = 'none';
     statusText.innerText = "Connection Established 🟢";
     statusText.style.backgroundColor = "#00ff88";
-    videoContainer.insertBefore(remoteBox, localBox);
+    
+    forceRemoteOnTop(); // NAYA: Call order fix
+
     setupPeerConnection();
     await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
     iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
@@ -297,10 +305,13 @@ acceptButton.addEventListener('click', async () => {
     socket.emit('answer', answer);
 });
 
+// Jab Call Lag Gayi
 socket.on('answer', async (answer) => {
     statusText.innerText = "Connection Established 🟢";
     statusText.style.backgroundColor = "#00ff88";
-    videoContainer.insertBefore(remoteBox, localBox);
+    
+    forceRemoteOnTop(); // NAYA: Call order fix
+    
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
     iceCandidateQueue = [];
