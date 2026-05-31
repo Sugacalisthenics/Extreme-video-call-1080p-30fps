@@ -5,45 +5,25 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-
-// Express se ek HTTP server banaya
 const server = http.createServer(app);
-
-// Socket.io ko apne server ke saath jod diya
 const io = new Server(server, {
-    cors: {
-        origin: "*", // Abhi ke liye sabko allow kar rahe hain
-        methods: ["GET", "POST"]
-    }
+    cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// Jab bhi koi naya user website kholega, yeh chalega
 io.on('connection', (socket) => {
-    console.log(`Naya user connect hua: ${socket.id}`);
+    socket.on('join', () => socket.broadcast.emit('user-joined'));
+    socket.on('join-ack', () => socket.broadcast.emit('join-ack'));
 
-    // Jab ek user dusre ko call ki details (offer) bhejega
-    socket.on('offer', (data) => {
-        socket.broadcast.emit('offer', data);
+    socket.on('offer', (data) => socket.broadcast.emit('offer', data));
+    socket.on('answer', (data) => socket.broadcast.emit('answer', data));
+    socket.on('ice-candidate', (data) => socket.broadcast.emit('ice-candidate', data));
+
+    // THE FIX: Dakiye ko sikhaya ki camera mode dusre user ko bhejna hai
+    socket.on('camera-facing', (mode) => {
+        socket.broadcast.emit('camera-facing', mode);
     });
 
-    // Jab dusra user call accept karke jawab (answer) dega
-    socket.on('answer', (data) => {
-        socket.broadcast.emit('answer', data);
-    });
-
-    // Network ka raasta (ICE Candidates) share karne ke liye
-    socket.on('ice-candidate', (data) => {
-        socket.broadcast.emit('ice-candidate', data);
-    });
-
-    // Jab user website band kar dega
-    socket.on('disconnect', () => {
-        console.log(`User disconnect ho gaya: ${socket.id}`);
-    });
+    socket.on('disconnect', () => socket.broadcast.emit('user-left'));
 });
 
-// Server ko port 5000 par start kar diya
-const PORT = 5000;
-server.listen(PORT, () => {
-    console.log(`Signaling Server port ${PORT} par daud raha hai 🚀`);
-});
+server.listen(5000, () => console.log('Server is running on port 5000'));
