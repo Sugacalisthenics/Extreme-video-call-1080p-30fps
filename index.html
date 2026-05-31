@@ -99,8 +99,6 @@
             object-fit: cover;
             max-height: 70vh;
         }
-        
-        /* CSS se mirror hata diya, ab JS handle karega 100% accuracy ke sath */
     </style>
 </head>
 <body>
@@ -181,14 +179,25 @@
             }
         }
 
-        // --- JS DIRECT MIRROR CONTROL ---
-        function applyMirrorLogic(isFrontCam) {
+        // Local Mirror Control
+        function applyLocalMirror(isFrontCam) {
             if (isFrontCam && !screenStream) {
                 localVideo.style.transform = "scaleX(-1)";
                 localVideo.style.webkitTransform = "scaleX(-1)";
             } else {
                 localVideo.style.transform = "scaleX(1)";
                 localVideo.style.webkitTransform = "scaleX(1)";
+            }
+        }
+
+        // NAYA: Remote Mirror Control (Signals se chalega)
+        function applyRemoteMirror(mode) {
+            if (mode === "user") {
+                remoteVideo.style.transform = "scaleX(-1)";
+                remoteVideo.style.webkitTransform = "scaleX(-1)";
+            } else {
+                remoteVideo.style.transform = "scaleX(1)";
+                remoteVideo.style.webkitTransform = "scaleX(1)";
             }
         }
 
@@ -212,6 +221,11 @@
             remoteBox.style.order = "2";
         });
 
+        // NAYA: Dusra user jab camera mode badle toh use suno
+        socket.on('camera-facing', (mode) => {
+            applyRemoteMirror(mode);
+        });
+
         async function startCamera(quality) {
             if(localStream) localStream.getTracks().forEach(track => track.stop()); 
             
@@ -223,8 +237,10 @@
                 localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 localVideo.srcObject = localStream;
                 
-                // Mirror fix applied here
-                applyMirrorLogic(currentFacingMode === "user");
+                applyLocalMirror(currentFacingMode === "user");
+                
+                // Camera badalte hi samne wale ko naya status bhejo
+                socket.emit('camera-facing', currentFacingMode);
                 
                 if(peerConnection && !screenStream) {
                     const videoTrack = localStream.getVideoTracks()[0];
@@ -263,34 +279,26 @@
             }
         });
 
-        // --- ROBUST SCREEN SHARE LOGIC ---
         shareScreenBtn.addEventListener('click', async () => {
             if (!screenStream) {
                 try {
-                    // Mobile browsers mein getDisplayMedia kabhi-kabhi restricted hota hai
                     screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                     const screenTrack = screenStream.getVideoTracks()[0];
                     
                     if (peerConnection) {
                         const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                        if (sender) {
-                            await sender.replaceTrack(screenTrack);
-                        }
+                        if (sender) await sender.replaceTrack(screenTrack);
                     }
                     
                     localVideo.srcObject = screenStream;
-                    applyMirrorLogic(false); // Screen ko mirror mat karo
+                    applyLocalMirror(false);
+                    socket.emit('camera-facing', "environment"); // Screen share ko mirror mat karo remote me
                     
                     shareScreenBtn.innerText = "🛑 Stop Share";
                     shareScreenBtn.style.backgroundColor = "#ff3366";
-                    
-                    screenTrack.onended = () => {
-                        stopScreenShare();
-                    };
+                    screenTrack.onended = stopScreenShare;
                 } catch (e) { 
-                    console.error("Screen share error: ", e); 
-                    // Agar phone ka OS block karega toh ye pop-up exact error batayega
-                    alert("Screen share start nahi ho paya: " + e.message);
+                    alert("Screen share failed: " + e.message);
                 }
             } else {
                 stopScreenShare();
@@ -302,20 +310,17 @@
                 screenStream.getTracks().forEach(track => track.stop());
                 screenStream = null;
             }
-            
             if (localStream) {
                 localVideo.srcObject = localStream;
-                applyMirrorLogic(currentFacingMode === "user");
+                applyLocalMirror(currentFacingMode === "user");
+                socket.emit('camera-facing', currentFacingMode); // Inform original cam state
 
                 if (peerConnection) {
                     const videoTrack = localStream.getVideoTracks()[0];
                     const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-                    if (sender) {
-                        await sender.replaceTrack(videoTrack);
-                    }
+                    if (sender) await sender.replaceTrack(videoTrack);
                 }
             }
-            
             shareScreenBtn.innerText = "💻 Share Screen";
             shareScreenBtn.style.backgroundColor = "#00aaff";
         }
@@ -329,19 +334,15 @@
                 } else {
                     alert("Mini Screen tab chalega jab dost ki video aayegi!");
                 }
-            } catch (error) {
-                console.error("PiP failed", error);
-            }
+            } catch (error) { console.error("PiP failed", error); }
         });
 
         function setupPeerConnection() {
             peerConnection = new RTCPeerConnection(servers);
             const streamToSend = screenStream || localStream;
-            
             if (streamToSend) {
                 streamToSend.getTracks().forEach(track => peerConnection.addTrack(track, streamToSend));
             }
-            
             peerConnection.ontrack = (event) => remoteVideo.srcObject = event.streams[0];
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) socket.emit('ice-candidate', event.candidate);
@@ -372,13 +373,15 @@
             acceptButton.style.display = 'none';
             statusText.innerText = "Connection Established 🟢";
             statusText.style.backgroundColor = "#00ff88";
-            
             forceRemoteOnTop(); 
-
             setupPeerConnection();
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
             iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
             iceCandidateQueue = [];
+            
+            // Connect hote hi samne wale ko current facing mode batao
+            socket.emit('camera-facing', currentFacingMode);
+
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
             socket.emit('answer', answer);
@@ -387,9 +390,11 @@
         socket.on('answer', async (answer) => {
             statusText.innerText = "Connection Established 🟢";
             statusText.style.backgroundColor = "#00ff88";
-            
             forceRemoteOnTop(); 
             
+            // Connect hote hi samne wale ko current facing mode batao
+            socket.emit('camera-facing', currentFacingMode);
+
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
             iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
             iceCandidateQueue = [];
