@@ -68,29 +68,16 @@ function setupPeerConnection() {
     };
 }
 
-// 3. UI Swap Logic (WhatsApp PIP Mode)
+// 3. UI Logic (Call connect hote hi aapki video hide ho jayegi)
 function switchToCallMode() {
     statusText.innerText = "Call Connected! 🟢";
     statusText.style.color = "#00ff88";
     
-    localVideo.className = 'pip-video';
+    // Aapki video poori tarah hide kar di (display: none)
+    localVideo.className = 'hidden';
+    // Dost ki video ko badi screen par set kar diya
     remoteVideo.className = 'main-video'; 
 }
-
-function handleVideoClick(e) {
-    if (e.target.classList.contains('pip-video')) {
-        if (localVideo.classList.contains('pip-video')) {
-            localVideo.className = 'main-video';
-            remoteVideo.className = 'pip-video';
-        } else {
-            remoteVideo.className = 'main-video';
-            localVideo.className = 'pip-video';
-        }
-    }
-}
-localVideo.addEventListener('click', handleVideoClick);
-remoteVideo.addEventListener('click', handleVideoClick);
-
 
 // 4. Call Lagana
 callButton.addEventListener('click', async () => {
@@ -131,12 +118,11 @@ acceptButton.addEventListener('click', async () => {
     socket.emit('answer', answer);
 });
 
-// 7. Dost ne call uthai (THE FIX IS HERE)
+// 7. Dost ne call uthai
 socket.on('answer', async (answer) => {
     switchToCallMode(); 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
 
-    // Fix: Caller ko bhi waiting list (Queue) wale network raste add karne padenge!
     iceCandidateQueue.forEach(async (candidate) => {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
     });
