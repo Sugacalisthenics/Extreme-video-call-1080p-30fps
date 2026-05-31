@@ -4,8 +4,9 @@ const callButton = document.getElementById('callButton');
 const acceptButton = document.getElementById('acceptButton');
 const statusText = document.getElementById('statusText');
 const qualitySelect = document.getElementById('qualitySelect');
-const localBox = document.getElementById('localBox');   // Reference added
-const remoteBox = document.getElementById('remoteBox'); // Reference added
+const localBox = document.getElementById('localBox');
+const remoteBox = document.getElementById('remoteBox');
+const videoContainer = document.getElementById('videoContainer');
 
 const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
@@ -43,9 +44,8 @@ socket.on('user-left', () => {
     statusText.style.backgroundColor = "#ff3366";
     statusText.style.color = "#fff";
     
-    // Reset to default positions if user leaves
-    localBox.style.order = "1";
-    remoteBox.style.order = "2";
+    // JS DOM REVERT: Agar koi call kaat de, toh wapas apni video upar (default)
+    videoContainer.insertBefore(localBox, remoteBox);
 });
 
 async function startCamera(quality) {
@@ -102,15 +102,14 @@ socket.on('offer', async (offer) => {
     acceptButton.style.display = 'inline-block';
 });
 
-// 1. JAB AAP ACCEPT KARTE HAIN (FORCED SWAP)
+// 1. JAB AAP CALL UTHATE HAIN (RECEIVER)
 acceptButton.addEventListener('click', async () => {
     acceptButton.style.display = 'none';
     statusText.innerText = "Connection Established 🟢";
     statusText.style.backgroundColor = "#00ff88";
     
-    // JS FORCE SWAP: Remote user goes to top (1), you go to bottom (2)
-    remoteBox.style.order = "1";
-    localBox.style.order = "2";
+    // JS DOM MAGIC: Physically remote box ko uthakar local box se pehle rakh do
+    videoContainer.insertBefore(remoteBox, localBox);
 
     setupPeerConnection();
     await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
@@ -123,14 +122,13 @@ acceptButton.addEventListener('click', async () => {
     socket.emit('answer', answer);
 });
 
-// 2. JAB DOST NE CALL ACCEPT KI (FORCED SWAP)
+// 2. JAB DOST NE CALL UTHAYI (CALLER)
 socket.on('answer', async (answer) => {
     statusText.innerText = "Connection Established 🟢";
     statusText.style.backgroundColor = "#00ff88";
     
-    // JS FORCE SWAP: Remote user goes to top (1), you go to bottom (2)
-    remoteBox.style.order = "1";
-    localBox.style.order = "2";
+    // JS DOM MAGIC: Physically remote box ko uthakar local box se pehle rakh do
+    videoContainer.insertBefore(remoteBox, localBox);
     
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
