@@ -75,13 +75,13 @@
             z-index: 1;
         }
 
-        /* Choti Screen (PIP) */
+        /* Choti Screen (PIP) - UPDATED FOR SMALLER SIZE AND BETTER POSITION */
         .pip-video {
             position: absolute;
-            width: 120px;
-            height: 160px;
-            bottom: 20px;
-            right: 20px;
+            width: 90px;       /* Pehle 120px tha, ab aur chota kar diya */
+            height: 130px;     /* Pehle 160px tha */
+            bottom: 12px;      /* Ekdum border ke paas neeche kar diya */
+            right: 12px;       /* Ekdum corner mein kar diya */
             border-radius: 8px;
             border: 2px solid white;
             object-fit: cover;
@@ -92,11 +92,13 @@
         }
         .pip-video:hover { transform: scale(1.05); }
 
-        /* Chupane ke liye */
         .hidden { display: none !important; }
 
-        /* Aapka camera hamesha mirror rahega */
-        #localVideo { transform: scaleX(-1); }
+        /* Dono videos hamesha mirror rahengi */
+        #localVideo, #remoteVideo { 
+            transform: scaleX(-1); 
+            -webkit-transform: scaleX(-1);
+        }
 
     </style>
 </head>
@@ -115,18 +117,13 @@
     
     <div id="statusText">Dost ka wait kar rahe hain...</div>
 
-    <!-- Naya Container -->
     <div class="video-wrapper">
-        <!-- Call lagne se pehle Aap badi screen par -->
         <video id="localVideo" class="main-video" autoplay playsinline muted></video>
-        <!-- Dost chhupa hua hai -->
         <video id="remoteVideo" class="pip-video hidden" autoplay playsinline></video>
     </div>
 
-    <!-- Strong CDN link -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     
-    <!-- Aapka logic -->
     <script src="script.js"></script>
 
 </body>
