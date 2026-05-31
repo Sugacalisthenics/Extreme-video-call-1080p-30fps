@@ -4,6 +4,7 @@ const callButton = document.getElementById('callButton');
 const acceptButton = document.getElementById('acceptButton');
 const statusText = document.getElementById('statusText');
 const qualitySelect = document.getElementById('qualitySelect');
+const videoContainer = document.getElementById('videoContainer');
 
 const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
@@ -21,12 +22,32 @@ const servers = {
     ]
 };
 
-// 1. Manual Camera Start
+socket.emit('join');
+
+socket.on('user-joined', () => {
+    statusText.innerText = "Participant is online. Ready to call 📞";
+    statusText.style.backgroundColor = "#00ff88";
+    statusText.style.color = "#000";
+    socket.emit('join-ack'); 
+});
+
+socket.on('join-ack', () => {
+    statusText.innerText = "Participant is online. Ready to call 📞";
+    statusText.style.backgroundColor = "#00ff88";
+    statusText.style.color = "#000";
+});
+
+socket.on('user-left', () => {
+    statusText.innerText = "Participant has left the lobby ❌";
+    statusText.style.backgroundColor = "#ff3366";
+    statusText.style.color = "#fff";
+    videoContainer.classList.remove('connected');
+});
+
 async function startCamera(quality) {
     if(localStream) {
         localStream.getTracks().forEach(track => track.stop()); 
     }
-    
     const constraints = quality === '1080' 
         ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: true }
         : { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true };
@@ -45,43 +66,21 @@ async function startCamera(quality) {
     }
 }
 
-qualitySelect.addEventListener('change', (e) => {
-    startCamera(e.target.value);
-});
+qualitySelect.addEventListener('change', (e) => startCamera(e.target.value));
 
-// 2. PeerConnection Setup
 function setupPeerConnection() {
     peerConnection = new RTCPeerConnection(servers);
-
-    localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-    });
-
-    peerConnection.ontrack = (event) => {
-        remoteVideo.srcObject = event.streams[0];
-    };
-
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    peerConnection.ontrack = (event) => remoteVideo.srcObject = event.streams[0];
     peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            socket.emit('ice-candidate', event.candidate);
-        }
+        if (event.candidate) socket.emit('ice-candidate', event.candidate);
     };
 }
 
-// 3. UI Logic (Call connect hote hi aapki video hide ho jayegi)
-function switchToCallMode() {
-    statusText.innerText = "Call Connected! 🟢";
-    statusText.style.color = "#00ff88";
-    
-    // Aapki video poori tarah hide kar di (display: none)
-    localVideo.className = 'hidden';
-    // Dost ki video ko badi screen par set kar diya
-    remoteVideo.className = 'main-video'; 
-}
-
-// 4. Call Lagana
 callButton.addEventListener('click', async () => {
-    statusText.innerText = "Calling... ⏳";
+    statusText.innerText = "Connecting... ⏳";
+    statusText.style.backgroundColor = "#ffcc00";
+    statusText.style.color = "#000";
     callButton.style.display = 'none';
     
     setupPeerConnection();
@@ -90,27 +89,26 @@ callButton.addEventListener('click', async () => {
     socket.emit('offer', offer);
 });
 
-// 5. Offer Aana
 socket.on('offer', async (offer) => {
     incomingOffer = offer; 
-    statusText.innerText = "Dost ki Call aa rahi hai! 📞";
-    statusText.style.color = "#ff3366";
-    
+    statusText.innerText = "Incoming video call... 📞";
+    statusText.style.backgroundColor = "#ffcc00";
+    statusText.style.color = "#000";
     callButton.style.display = 'none';
     acceptButton.style.display = 'inline-block';
 });
 
-// 6. Call Uthana
 acceptButton.addEventListener('click', async () => {
     acceptButton.style.display = 'none';
-    switchToCallMode(); 
+    statusText.innerText = "Connection Established 🟢";
+    statusText.style.backgroundColor = "#00ff88";
+    
+    videoContainer.classList.add('connected');
 
     setupPeerConnection();
     await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
 
-    iceCandidateQueue.forEach(async (candidate) => {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+    iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
     iceCandidateQueue = [];
 
     const answer = await peerConnection.createAnswer();
@@ -118,18 +116,17 @@ acceptButton.addEventListener('click', async () => {
     socket.emit('answer', answer);
 });
 
-// 7. Dost ne call uthai
 socket.on('answer', async (answer) => {
-    switchToCallMode(); 
+    statusText.innerText = "Connection Established 🟢";
+    statusText.style.backgroundColor = "#00ff88";
+    
+    videoContainer.classList.add('connected');
+    
     await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-
-    iceCandidateQueue.forEach(async (candidate) => {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+    iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
     iceCandidateQueue = [];
 });
 
-// 8. Network Rasta Aana
 socket.on('ice-candidate', async (candidate) => {
     if (peerConnection && peerConnection.remoteDescription) {
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -138,5 +135,4 @@ socket.on('ice-candidate', async (candidate) => {
     }
 });
 
-// Start with selected quality
 startCamera(qualitySelect.value);
