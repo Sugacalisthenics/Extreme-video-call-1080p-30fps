@@ -2,8 +2,8 @@ const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const callButton = document.getElementById('callButton');
 
-// Server se connection (Port 5000)
-const socket = io('http://localhost:5000');
+// Aapka Live Render Server
+const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
 let localStream;
 let peerConnection;
