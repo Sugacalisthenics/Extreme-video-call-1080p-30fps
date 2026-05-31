@@ -14,6 +14,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
+            overflow-x: hidden; /* Screen ke bahar kuch na jaye */
         }
         
         .controls {
@@ -101,10 +102,8 @@
             object-fit: cover;
         }
         
-        /* FIX: Sirf .mirror class hone par hi video mirror hogi */
         .mirror { transform: scaleX(-1); -webkit-transform: scaleX(-1); }
 
-        /* FIX: Chat Box UI & Clickability */
         .chat-container {
             flex: 1;
             width: 100%;
@@ -165,6 +164,21 @@
             cursor: pointer;
             margin-right: 10px;
             padding: 5px;
+        }
+
+        /* NAYA FIX: Mobile Screen ke liye special Layout */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column; /* Phone par video aur chat upar neeche aayein */
+                align-items: center;
+            }
+            .chat-container {
+                width: 95vw; /* Phone ki poori width le */
+                max-width: 100%;
+                margin-top: 10px;
+                margin-bottom: 40px; /* Neeche thodi jagah chhod de */
+                height: 400px;
+            }
         }
     </style>
 </head>
@@ -283,7 +297,6 @@
             remoteBox.style.order = "2";
         });
 
-        // --- THE PERFECT MIRROR FIX ---
         async function startCamera(quality) {
             if(localStream) localStream.getTracks().forEach(track => track.stop()); 
             
@@ -295,7 +308,6 @@
                 localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 localVideo.srcObject = localStream;
                 
-                // Sirf front camera pe aapko aaina dikhega, back camera ekdum seedha rahega
                 if (currentFacingMode === "user" && !screenStream) {
                     localVideo.classList.add('mirror');
                 } else {
@@ -349,7 +361,7 @@
                         if (sender) sender.replaceTrack(screenTrack);
                     }
                     localVideo.srcObject = screenStream;
-                    localVideo.classList.remove('mirror'); // Screen share kabhi mirror nahi hona chahiye
+                    localVideo.classList.remove('mirror');
                     shareScreenBtn.innerText = "🛑 Stop Share";
                     shareScreenBtn.style.backgroundColor = "#ff3366";
                     screenTrack.onended = stopScreenShare;
@@ -389,7 +401,6 @@
             }
         });
 
-        // --- CHAT BOX ROBUST LOGIC ---
         function appendMessage(text, isMe) {
             const msgDiv = document.createElement('div');
             msgDiv.innerText = text;
