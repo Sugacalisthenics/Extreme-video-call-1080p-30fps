@@ -68,7 +68,7 @@
             align-items: center;
             width: 100%;
             max-width: 600px;
-            transition: all 0.5s ease;
+            transition: all 0.4s ease; /* Smooth layout transition */
         }
         
         video {
@@ -83,12 +83,6 @@
             transform: scaleX(-1); 
             -webkit-transform: scaleX(-1);
         }
-
-        #localBox { order: 1; }
-        #remoteBox { order: 2; }
-        .video-container.connected #remoteBox { order: 1; }
-        .video-container.connected #localBox { order: 2; }
-
     </style>
 </head>
 <body>
@@ -107,12 +101,12 @@
     <div id="statusText">Waiting for participant to join... ⏳</div>
 
     <div class="video-container" id="videoContainer">
-        <div class="video-box" id="localBox">
+        <div class="video-box" id="localBox" style="order: 1;">
             <h3>You (Local)</h3>
             <video id="localVideo" autoplay playsinline muted></video>
         </div>
         
-        <div class="video-box" id="remoteBox">
+        <div class="video-box" id="remoteBox" style="order: 2;">
             <h3>Remote User</h3>
             <video id="remoteVideo" autoplay playsinline></video>
         </div>
