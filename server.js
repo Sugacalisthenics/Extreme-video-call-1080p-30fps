@@ -18,7 +18,7 @@ io.on('connection', (socket) => {
     socket.on('answer', (data) => socket.broadcast.emit('answer', data));
     socket.on('ice-candidate', (data) => socket.broadcast.emit('ice-candidate', data));
 
-    // THE FIX: Dakiye ko sikhaya ki camera mode dusre user ko bhejna hai
+    // Camera mode sync
     socket.on('camera-facing', (mode) => {
         socket.broadcast.emit('camera-facing', mode);
     });
@@ -26,4 +26,6 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => socket.broadcast.emit('user-left'));
 });
 
-server.listen(5000, () => console.log('Server is running on port 5000'));
+// FIX: Render dynamic port support
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
