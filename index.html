@@ -65,6 +65,17 @@
             min-width: 300px;
         }
 
+        /* NAYA: Live Call Timer ka Style */
+        #callTimer {
+            display: none;
+            font-size: 1.8rem;
+            color: #00ff88;
+            font-weight: bold;
+            margin-top: 10px;
+            font-family: monospace;
+            text-shadow: 0px 0px 10px rgba(0, 255, 136, 0.5);
+        }
+
         .main-content {
             display: flex;
             flex-wrap: wrap;
@@ -123,6 +134,8 @@
     </div>
     
     <div id="statusText">Waiting for participant to join... ⏳</div>
+    
+    <div id="callTimer">00:00</div>
 
     <div class="main-content">
         <div class="video-container" id="videoContainer">
@@ -151,6 +164,8 @@
         const flipCamBtn = document.getElementById('flipCamBtn');
         const shareScreenBtn = document.getElementById('shareScreenBtn');
         const pipBtn = document.getElementById('pipBtn'); 
+        
+        const callTimer = document.getElementById('callTimer');
 
         const socket = io('https://extreme-video-call-1080p-30fps.onrender.com');
 
@@ -164,6 +179,10 @@
         let isVideoMuted = false;
         let currentFacingMode = "user";
 
+        // Timer Variables
+        let timerInterval;
+        let startTime;
+
         const servers = {
             iceServers: [
                 { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
@@ -172,6 +191,25 @@
             ]
         };
 
+        // --- TIMER FUNCTIONS ---
+        function startTimer() {
+            clearInterval(timerInterval); // Safety check
+            callTimer.style.display = 'block';
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const minutes = Math.floor(elapsed / 60000).toString().padStart(2, '0');
+                const seconds = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
+                callTimer.innerText = `${minutes}:${seconds}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            callTimer.style.display = 'none';
+            callTimer.innerText = "00:00";
+        }
+
         function forceRemoteOnTop() {
             if(remoteBox && localBox) {
                 remoteBox.style.order = "1";
@@ -179,7 +217,6 @@
             }
         }
 
-        // Local Mirror Control
         function applyLocalMirror(isFrontCam) {
             if (isFrontCam && !screenStream) {
                 localVideo.style.transform = "scaleX(-1)";
@@ -190,7 +227,6 @@
             }
         }
 
-        // NAYA: Remote Mirror Control (Signals se chalega)
         function applyRemoteMirror(mode) {
             if (mode === "user") {
                 remoteVideo.style.transform = "scaleX(-1)";
@@ -219,9 +255,9 @@
             statusText.style.color = "#fff";
             localBox.style.order = "1";
             remoteBox.style.order = "2";
+            stopTimer(); // NAYA: Dost gaya toh timer band
         });
 
-        // NAYA: Dusra user jab camera mode badle toh use suno
         socket.on('camera-facing', (mode) => {
             applyRemoteMirror(mode);
         });
@@ -229,17 +265,22 @@
         async function startCamera(quality) {
             if(localStream) localStream.getTracks().forEach(track => track.stop()); 
             
+            // NAYA: Hardware-level Noise Suppression & Echo Cancellation (Pro Audio)
+            const audioConstraints = {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            };
+
             const constraints = quality === '1080' 
-                ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: currentFacingMode }, audio: true }
-                : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }, audio: true };
+                ? { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: currentFacingMode }, audio: audioConstraints }
+                : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode }, audio: audioConstraints };
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia(constraints);
                 localVideo.srcObject = localStream;
                 
                 applyLocalMirror(currentFacingMode === "user");
-                
-                // Camera badalte hi samne wale ko naya status bhejo
                 socket.emit('camera-facing', currentFacingMode);
                 
                 if(peerConnection && !screenStream) {
@@ -292,7 +333,7 @@
                     
                     localVideo.srcObject = screenStream;
                     applyLocalMirror(false);
-                    socket.emit('camera-facing', "environment"); // Screen share ko mirror mat karo remote me
+                    socket.emit('camera-facing', "environment");
                     
                     shareScreenBtn.innerText = "🛑 Stop Share";
                     shareScreenBtn.style.backgroundColor = "#ff3366";
@@ -313,7 +354,7 @@
             if (localStream) {
                 localVideo.srcObject = localStream;
                 applyLocalMirror(currentFacingMode === "user");
-                socket.emit('camera-facing', currentFacingMode); // Inform original cam state
+                socket.emit('camera-facing', currentFacingMode);
 
                 if (peerConnection) {
                     const videoTrack = localStream.getVideoTracks()[0];
@@ -373,13 +414,15 @@
             acceptButton.style.display = 'none';
             statusText.innerText = "Connection Established 🟢";
             statusText.style.backgroundColor = "#00ff88";
+            
             forceRemoteOnTop(); 
+            startTimer(); // NAYA: Timer chalu
+
             setupPeerConnection();
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
             iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
             iceCandidateQueue = [];
             
-            // Connect hote hi samne wale ko current facing mode batao
             socket.emit('camera-facing', currentFacingMode);
 
             const answer = await peerConnection.createAnswer();
@@ -390,9 +433,10 @@
         socket.on('answer', async (answer) => {
             statusText.innerText = "Connection Established 🟢";
             statusText.style.backgroundColor = "#00ff88";
-            forceRemoteOnTop(); 
             
-            // Connect hote hi samne wale ko current facing mode batao
+            forceRemoteOnTop(); 
+            startTimer(); // NAYA: Timer chalu
+            
             socket.emit('camera-facing', currentFacingMode);
 
             await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
