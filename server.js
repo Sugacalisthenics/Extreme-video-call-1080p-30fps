@@ -18,14 +18,17 @@ io.on('connection', (socket) => {
     socket.on('answer', (data) => socket.broadcast.emit('answer', data));
     socket.on('ice-candidate', (data) => socket.broadcast.emit('ice-candidate', data));
 
-    // Camera mode sync
     socket.on('camera-facing', (mode) => {
         socket.broadcast.emit('camera-facing', mode);
+    });
+
+    // NAYA: Jab koi "End Call" dabaye, toh doosre ko instant notification bhejo
+    socket.on('leave-call', () => {
+        socket.broadcast.emit('user-left');
     });
 
     socket.on('disconnect', () => socket.broadcast.emit('user-left'));
 });
 
-// FIX: Render dynamic port support
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

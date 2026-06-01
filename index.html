@@ -38,7 +38,8 @@
         select { background-color: #333; color: #fff; border: 1px solid #00ff88; }
         
         #callButton { background-color: #00ff88; color: #000; }
-        #acceptButton { background-color: #ff3366; color: #fff; display: none; }
+        #acceptButton { background-color: #00aaff; color: #fff; display: none; }
+        #hangupButton { background-color: #ff3366; color: #fff; display: none; } /* Red Hangup Button */
         
         .action-bar {
             display: flex;
@@ -65,7 +66,6 @@
             min-width: 300px;
         }
 
-        /* NAYA: Live Call Timer ka Style */
         #callTimer {
             display: none;
             font-size: 1.8rem;
@@ -123,7 +123,7 @@
         </select>
         <button id="callButton">Start Call 📞</button>
         <button id="acceptButton">Accept Call 🟢</button>
-    </div>
+        <button id="hangupButton">End Call 🛑</button> </div>
 
     <div class="action-bar">
         <button id="toggleMicBtn" class="action-btn">🎤 Mic On</button>
@@ -154,6 +154,7 @@
         const remoteVideo = document.getElementById('remoteVideo');
         const callButton = document.getElementById('callButton');
         const acceptButton = document.getElementById('acceptButton');
+        const hangupButton = document.getElementById('hangupButton'); // Added Reference
         const statusText = document.getElementById('statusText');
         const qualitySelect = document.getElementById('qualitySelect');
         const localBox = document.getElementById('localBox');
@@ -179,7 +180,6 @@
         let isVideoMuted = false;
         let currentFacingMode = "user";
 
-        // Timer Variables
         let timerInterval;
         let startTime;
 
@@ -193,7 +193,7 @@
 
         // --- TIMER FUNCTIONS ---
         function startTimer() {
-            clearInterval(timerInterval); // Safety check
+            clearInterval(timerInterval); 
             callTimer.style.display = 'block';
             startTime = Date.now();
             timerInterval = setInterval(() => {
@@ -237,6 +237,35 @@
             }
         }
 
+        // --- NAYA: CALL TERMINATION FUNCTION (CLEAN RESET) ---
+        function cleanResetCall(statusMessage, statusBg, statusColor) {
+            stopTimer();
+            
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (remoteVideo) remoteVideo.srcObject = null;
+            if (screenStream) stopScreenShare();
+
+            statusText.innerText = statusMessage;
+            statusText.style.backgroundColor = statusBg;
+            statusText.style.color = statusColor;
+
+            // Reset UI Layout & Buttons
+            callButton.style.display = 'inline-block';
+            hangupButton.style.display = 'none';
+            acceptButton.style.display = 'none';
+            localBox.style.order = "1";
+            remoteBox.style.order = "2";
+        }
+
+        // Manual End Call Click Handler
+        hangupButton.addEventListener('click', () => {
+            socket.emit('leave-call'); // Inform backend/other user instantly
+            cleanResetCall("Call ended 🛑", "#333", "#ff3366");
+        });
+
         socket.emit('join');
         socket.on('user-joined', () => {
             statusText.innerText = "Participant is online. Ready to call 📞";
@@ -249,13 +278,10 @@
             statusText.style.backgroundColor = "#00ff88";
             statusText.style.color = "#000";
         });
+        
+        // Jab doosra banda call kaat de
         socket.on('user-left', () => {
-            statusText.innerText = "Participant left the lobby ❌";
-            statusText.style.backgroundColor = "#ff3366";
-            statusText.style.color = "#fff";
-            localBox.style.order = "1";
-            remoteBox.style.order = "2";
-            stopTimer(); // NAYA: Dost gaya toh timer band
+            cleanResetCall("Participant left the call ❌", "#ff3366", "#fff");
         });
 
         socket.on('camera-facing', (mode) => {
@@ -265,7 +291,6 @@
         async function startCamera(quality) {
             if(localStream) localStream.getTracks().forEach(track => track.stop()); 
             
-            // NAYA: Hardware-level Noise Suppression & Echo Cancellation (Pro Audio)
             const audioConstraints = {
                 echoCancellation: true,
                 noiseSuppression: true,
@@ -395,6 +420,8 @@
             statusText.style.backgroundColor = "#ffcc00";
             statusText.style.color = "#000";
             callButton.style.display = 'none';
+            hangupButton.style.display = 'inline-block'; // Show Hangup Button
+            
             setupPeerConnection();
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
@@ -412,11 +439,12 @@
 
         acceptButton.addEventListener('click', async () => {
             acceptButton.style.display = 'none';
+            hangupButton.style.display = 'inline-block'; // Show Hangup Button
             statusText.innerText = "Connection Established 🟢";
             statusText.style.backgroundColor = "#00ff88";
             
             forceRemoteOnTop(); 
-            startTimer(); // NAYA: Timer chalu
+            startTimer(); 
 
             setupPeerConnection();
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOffer));
@@ -435,7 +463,7 @@
             statusText.style.backgroundColor = "#00ff88";
             
             forceRemoteOnTop(); 
-            startTimer(); // NAYA: Timer chalu
+            startTimer(); 
             
             socket.emit('camera-facing', currentFacingMode);
 
