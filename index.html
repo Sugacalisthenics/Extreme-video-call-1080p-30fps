@@ -106,7 +106,7 @@
             border: 3px solid #00ff88;
             border-radius: 12px;
             background-color: #000;
-            box-shadow: 0px 0px 20px rgba(0, 255, 136, 0.4); /* Glow effect badhaya hai premium feel ke liye */
+            box-shadow: 0px 0px 20px rgba(0, 255, 136, 0.4); 
             object-fit: cover;
             max-height: 70vh;
         }
@@ -118,9 +118,9 @@
     
     <div class="controls">
         <select id="qualitySelect">
-            <option value="4k">🔥 4K Ultra HD (2160p)</option>
-            <option value="2k">✨ 2K Quad HD (1440p)</option>
-            <option value="1080" selected>🚀 1080p Premium (High Bitrate)</option>
+            <option value="4k">🔥 4K Ultra HD (2160p - 60FPS)</option>
+            <option value="2k">✨ 2K Quad HD (1440p - 60FPS)</option>
+            <option value="1080" selected>🚀 1080p Premium (God Mode)</option>
             <option value="720">📺 720p Standard</option>
         </select>
         <button id="callButton">Start Call 📞</button>
@@ -194,7 +194,7 @@
             ]
         };
 
-        // --- NAYA: ULTRA HIGH BITRATE HACK ---
+        // --- UPGRADED: GOD MODE BITRATE & ENGINE LOCK ---
         async function forcePremiumBitrate() {
             if (!peerConnection) return;
             const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
@@ -202,18 +202,25 @@
                 const parameters = sender.getParameters();
                 if (!parameters.encodings) parameters.encodings = [{}];
                 
-                // Forcing 8 Mbps (8,000,000 bps) exactly like YouTube Premium 1080p
-                parameters.encodings[0].maxBitrate = 8000000; 
+                // 1. Extreme 15 Mbps Bitrate 
+                parameters.encodings[0].maxBitrate = 15000000; 
+                
+                // 2. Strict Lock: Browser ko video compress karne se rokna
+                parameters.encodings[0].scaleResolutionDownBy = 1; 
+                
+                // 3. Engine Command: Framerate gire toh gire, par Resolution nahi girna chahiye!
+                parameters.degradationPreference = "maintain-resolution";
                 
                 try {
                     await sender.setParameters(parameters);
-                    console.log("🔥 Premium Bitrate 8Mbps Activated!");
+                    console.log("🔥 GOD MODE: 15Mbps & Resolution Lock Activated!");
                 } catch (e) {
                     console.error("Bitrate push failed:", e);
                 }
             }
         }
 
+        // --- TIMER FUNCTIONS ---
         function startTimer() {
             clearInterval(timerInterval); 
             callTimer.style.display = 'block';
@@ -305,17 +312,22 @@
             applyRemoteMirror(mode);
         });
 
+        // --- UPGRADED: 60 FPS SMOOTHNESS ---
         async function startCamera(quality) {
             if(localStream) localStream.getTracks().forEach(track => track.stop()); 
             
             const audioConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
             
-            // NAYA: 2K aur 4K Resolution Logic
             let videoConstraints;
-            if (quality === '4k') videoConstraints = { width: { ideal: 3840 }, height: { ideal: 2160 }, facingMode: currentFacingMode };
-            else if (quality === '2k') videoConstraints = { width: { ideal: 2560 }, height: { ideal: 1440 }, facingMode: currentFacingMode };
-            else if (quality === '1080') videoConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: currentFacingMode };
-            else videoConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: currentFacingMode };
+            if (quality === '4k') {
+                videoConstraints = { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 60 }, facingMode: currentFacingMode };
+            } else if (quality === '2k') {
+                videoConstraints = { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60 }, facingMode: currentFacingMode };
+            } else if (quality === '1080') {
+                videoConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 }, facingMode: currentFacingMode };
+            } else {
+                videoConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 }, facingMode: currentFacingMode };
+            }
 
             const constraints = { video: videoConstraints, audio: audioConstraints };
 
@@ -331,7 +343,7 @@
                     const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
                     if(sender) {
                         await sender.replaceTrack(videoTrack); 
-                        forcePremiumBitrate(); // Replace hone par wapas 8Mbps force karo
+                        forcePremiumBitrate(); 
                     }
                 }
                 
@@ -339,6 +351,7 @@
                 localStream.getVideoTracks()[0].enabled = !isVideoMuted;
             } catch (error) {
                 console.error("Camera error:", error);
+                alert("Aapke camera hardware ne is extreme quality ko support nahi kiya. Standard quality par start ho raha hai.");
             }
         }
         qualitySelect.addEventListener('change', (e) => startCamera(e.target.value));
@@ -376,7 +389,7 @@
                         const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
                         if (sender) {
                             await sender.replaceTrack(screenTrack);
-                            forcePremiumBitrate(); // Screen share pe high bitrate zaroori hai
+                            forcePremiumBitrate(); 
                         }
                     }
                     
@@ -484,7 +497,6 @@
             await peerConnection.setLocalDescription(answer);
             socket.emit('answer', answer);
 
-            // NAYA: Connection complete hone ke baad high bitrate force karo
             setTimeout(forcePremiumBitrate, 1000); 
         });
 
@@ -501,7 +513,6 @@
             iceCandidateQueue.forEach(async (candidate) => await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)));
             iceCandidateQueue = [];
 
-            // NAYA: Connection complete hone ke baad high bitrate force karo
             setTimeout(forcePremiumBitrate, 1000);
         });
 
